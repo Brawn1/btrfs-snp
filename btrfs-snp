@@ -4,7 +4,7 @@
 # Script that creates BTRFS snapshots, manually or from cron
 #
 # Usage:
-#          sudo btrfs-snp  <dir> (<tag>) (<limit>) (<seconds>) (<destdir>)
+#          sudo btrfs-snp  <dir> (<tag>) (<limit>) (<destdir>)
 #
 # Copyleft 2017 by Ignacio Nunez Hernanz <nacho _a_t_ ownyourbits _d_o_t_ com>
 # GPL licensed (see end of file) * Use at your own risk!
@@ -20,19 +20,18 @@
 
 function help(BIN){
   ## show usage
-  echo "Usage: $BIN <dir> (<tag>) (<limit>) (<seconds>) (<destdir>)
+  echo "Usage: $BIN <dir> (<tag>) (<limit>) (<destdir>)
 
   dir     │ create snapshot of <dir>
   tag     │ name the snapshot <tag>_<timestamp>
   limit   │ keep <limit> snapshots with this tag. 0 to disable
-  seconds │ don't create snapshots before <seconds> have passed from last with this tag. 0 to disable
   destdir │ store snapshot in <destdir>, path absolute or relative to <dir>
 
 Cron example: Hourly snapshot many times per folder, if executes hourly.
 
 cat > /etc/cron.hourly/$BIN <<EOF
 #!/bin/bash
-/usr/local/sbin/$BIN /data/share1 share1 8 /data/share1/.snapshots # generates 8 snapshots and delete the oldest if nineth is created.
+/usr/local/sbin/$BIN /data/share1 share1 8 /data/share1/.snapshots # generates 8 snapshots and delete the oldest if 9th is created.
 /usr/local/sbin/$BIN /data/share2 share2 10 /data/share2/.snapshots
 EOF
 chmod +x /etc/cron.hourly/$BIN"
