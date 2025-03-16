@@ -8,11 +8,36 @@
 #
 # Copyleft 2017 by Ignacio Nunez Hernanz <nacho _a_t_ ownyourbits _d_o_t_ com>
 # GPL licensed (see end of file) * Use at your own risk!
+# @Brawn1 2020 changed snapshot generation name and handling to use it direct with Samba and windows
+# Explorer History.
+# this script is very simple, and creates snapshot if is executed.
+# so for hourly snapshots start hourly. :-)
 #
 # Based on btrfs-snap by Birger Monsen
 #
 # More at https://ownyourbits.com
 #
+
+function help(BIN){
+  ## show usage
+  echo "Usage: $BIN <dir> (<tag>) (<limit>) (<seconds>) (<destdir>)
+
+  dir     │ create snapshot of <dir>
+  tag     │ name the snapshot <tag>_<timestamp>
+  limit   │ keep <limit> snapshots with this tag. 0 to disable
+  seconds │ don't create snapshots before <seconds> have passed from last with this tag. 0 to disable
+  destdir │ store snapshot in <destdir>, path absolute or relative to <dir>
+
+Cron example: Hourly snapshot many times per folder, if executes hourly.
+
+cat > /etc/cron.hourly/$BIN <<EOF
+#!/bin/bash
+/usr/local/sbin/$BIN /data/share1 share1 8 /data/share1/.snapshots # generates 8 snapshots and delete the oldest if nineth is created.
+/usr/local/sbin/$BIN /data/share2 share2 10 /data/share2/.snapshots
+EOF
+chmod +x /etc/cron.hourly/$BIN"
+}
+
 
 function btrfs-snp()
 {
@@ -26,30 +51,12 @@ function btrfs-snp()
 
   ## usage
   [[ "$*" == "" ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]] && {
-    echo "Usage: $BIN <dir> (<tag>) (<limit>) (<seconds>) (<destdir>)
-
-  dir     │ create snapshot of <dir>
-  tag     │ name the snapshot <tag>_<timestamp>
-  limit   │ keep <limit> snapshots with this tag. 0 to disable
-  seconds │ don't create snapshots before <seconds> have passed from last with this tag. 0 to disable
-  destdir │ store snapshot in <destdir>, path absolute or relative to <dir>
-
-Cron example: Hourly snapshot for one day, daily for one week, weekly for one month, and monthly for one year.
-
-cat > /etc/cron.hourly/$BIN <<EOF
-#!/bin/bash
-/usr/local/sbin/$BIN /home hourly  24 3600
-/usr/local/sbin/$BIN /home daily    7 86400
-/usr/local/sbin/$BIN /home weekly   4 604800
-/usr/local/sbin/$BIN /     weekly   4 604800
-/usr/local/sbin/$BIN /home monthly 12 2592000
-EOF
-chmod +x /etc/cron.hourly/$BIN"
+    help($BIN)
     return 0
   }
 
   ## checks
-  local SNAPSHOT=${TAG}_$( date +%F_%H%M%S )
+  local SNAPSHOT=${TAG}_$( date +%Y.%m.%d-%H.%M.%S )
 
   [[ ${EUID} -ne 0  ]] && { echo "Must be run as root. Try 'sudo $BIN'"; return 1; }
   [[ -d "$SNAPSHOT" ]] && { echo "$SNAPSHOT already exists"            ; return 1; }
@@ -64,14 +71,6 @@ chmod +x /etc/cron.hourly/$BIN"
   [[ "$DST" = /* ]] || DST="$DIR/$DST"
   mkdir -p "$DST"
   local SNAPS=( $( ls -d "$DST/${TAG}_"* 2>/dev/null ) )
-
-  ## check time of the last snapshot for this tag
-  [[ "$TIME" != 0 ]] && [[ "${#SNAPS[@]}" != 0 ]] && {
-    local LATEST=$( sed -r "s|.*_(.*_.*)|\\1|;s|_([0-9]{2})([0-9]{2})([0-9]{2})| \\1:\\2:\\3|" <<< "${SNAPS[-1]}" )
-    LATEST=$( date +%s -d "$LATEST" ) || return 1
-
-    [[ $(( LATEST + TIME )) -gt $(( $( date +%s ) + MARGIN )) ]] && { echo "No new snapshot needed for $TAG in $DIR"; return 0; }
-  }
 
   ## do it
   btrfs subvolume snapshot -r "$DIR" "$DST/$SNAPSHOT" || return 1
